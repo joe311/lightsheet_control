@@ -1,0 +1,12 @@
+#update with:   conda env update --file requirements.yml --prune
+name: galvo_control
+channels:
+  - conda-forge
+dependencies:
+  - numpy
+  - matplotlib
+  - scipy
+  - pip
+  - pip:
+      nidaqmx
+      superqt
