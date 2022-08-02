@@ -14,12 +14,29 @@ class SawtoothWaveform:
         self.frequency = 20
 
     def waveform(self, sample_times):
-        print(self.channel, self.min, self.max)
+        # print(self.channel, self.min, self.max)
         raw = (sample_times * self.frequency) % 1
         scaled = raw * (self.max - self.min) + self.min
         return scaled
         # xraw = ((np.arange(self.samples_per_refresh) + 1) % (self.samples_per_pixel * self.pixels_x)) / (self.samples_per_pixel * self.pixels_x)
         # xraw = np.pad(np.cumsum(gaussian_filter1d(np.diff(xraw), sigma=10)), (1, 0))
+
+
+class CameraTriggerWaveform:
+    def __init__(self, channel, min_val, max_val):
+        self.channel = channel
+        self.min_val = min_val
+        self.min = min_val
+        self.max_val = max_val
+        self.max = max_val
+        self.frequency = 20
+        self.duty_cycle = .5
+
+    def waveform(self, sample_times):
+        raw = (sample_times * self.frequency - 0.00001) % 1  # tiny offset to start at 0
+        raw = (raw < self.duty_cycle).astype(float)
+        scaled = raw * (self.max - self.min) + self.min
+        return scaled
 
 
 class WaveformGen:
@@ -47,7 +64,8 @@ class WaveformGen:
         self.xgalvo = SawtoothWaveform('/ao0', -10, 10)
         self.zgalvo = SawtoothWaveform('/ao1', -10, 10)
         self.piezowaveform = SawtoothWaveform('/ao2', 0, 10)
-        self._ao_waveforms = [self.xgalvo, self.zgalvo, self.piezowaveform]  # AO order matches
+        self.camera_trigger = CameraTriggerWaveform('/ao3', 0, 5)
+        self._ao_waveforms = [self.xgalvo, self.zgalvo, self.piezowaveform, self.camera_trigger]
 
         # AI params
         self.ai_channels = ['/ai0']  # Piezo feedback
@@ -57,7 +75,6 @@ class WaveformGen:
         self.ai_task = None
 
         # AO params
-        # self.ao_channels = ['/ao0', '/ao1', '/ao2']
         self.writer = None
         self.ao_task = None
 
@@ -80,6 +97,7 @@ class WaveformGen:
         self.xgalvo.frequency = self.framesperbuffer * self.refreshes_per_sec
         self.zgalvo.frequency = self.vps
         self.piezowaveform.frequency = self.vps
+        self.camera_trigger.frequency = self.xgalvo.frequency
 
     def init_ai(self):
         ai_task = nidaqmx.Task()
@@ -217,7 +235,7 @@ class WaveformGen:
 
 
 if __name__ == '__main__':
-    gen = WaveformGen(devname='Dev3')
+    gen = WaveformGen(devname='Dev2')
     gen.start()
     import time
 

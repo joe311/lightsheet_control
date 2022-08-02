@@ -92,6 +92,7 @@ class WaveformGUI(QtWidgets.QWidget):
         graphics.setLevels(-15, 15)
         graphics.setMinimumWidth(600)
         graphics.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.graphics = graphics
         vbox_images.addWidget(graphics)
 
         self.savebutton = QtWidgets.QPushButton("Save last acquisition")
@@ -112,7 +113,17 @@ class WaveformGUI(QtWidgets.QWidget):
         self.setGeometry(50, 50, 1400, 1000)
         self.show()
         self.started = False
-        self.lastacqframes = []
+        self.camera_frames = []
+
+        self.timer = pg.QtCore.QTimer()
+        self.timer.timeout.connect(self.grab_camera)
+
+    def grab_camera(self):
+        frames = self.camera.grab_frames()
+        if frames:
+            for frame in frames:
+                self.camera_frames.append(frame)
+                self.graphics.setImage(frame)
 
     def update(self):
         # Give updated values to the wavegen object
@@ -136,6 +147,9 @@ class WaveformGUI(QtWidgets.QWidget):
         self.startstopbutton.setText("Scanning")
         self.startstopbutton.setStyleSheet("background-color: red")
         [w.setDisabled(True) for w in self.state_toggles_widgets]
+        self.camera_frames = []
+        self.camera.start_acquisition()
+        self.timer.start(1000 / self.wavegen.camera_trigger.frequency)  # ms
         self.wavegen.start()
 
     def stop(self):
@@ -145,6 +159,8 @@ class WaveformGUI(QtWidgets.QWidget):
         [w.setDisabled(False) for w in self.state_toggles_widgets]
         # self.lastacqframes = self.wavegen.frames
         self.wavegen.stop()
+        self.camera.stop_acquisition()
+        self.timer.stop()
         self.wavegen.close()
 
     # def closeEvent(self, event):
@@ -152,9 +168,9 @@ class WaveformGUI(QtWidgets.QWidget):
     #     event.accept()
 
     def save(self):
-        if self.lastacqframes:
+        if self.camera_frames:
             filename = QtWidgets.QFileDialog.getSaveFileName(filter="Tif files (*.tif)")[0]
-            io.imsave(filename, np.stack(self.lastacqframes))
+            io.imsave(filename, np.stack(self.camera_frames))
             # msg = QtWidgets.QMessageBox()
             # msg.setIcon(QtWidgets.QMessageBox.Information)
             # msg.setText(f"The last acquisition has been saved to: <b> {filename}</b>")
